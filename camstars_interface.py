@@ -1,3 +1,4 @@
+#!/opt/ioa/software/anaconda/anaconda36/envs/20190218_py36/bin/python
 # -*- coding: utf-8 -*-
 """
 Plot Reader reads in the data stored in Cambridge STARS plot files, which
@@ -64,13 +65,21 @@ class dataStore:
         self.log_rho_c = self.full_table.columns[72]
         self.log_T_c = self.full_table.columns[73]
         
-    def HRD(self):
-        plt.plot(self.log_teff, self.log_lum)
-        plt.xlim(max(self.log_teff) ,min(self.log_teff))
-        plt.title(r'HRD')
-        plt.xlabel(r'Effective Temperature $log_{10}(K)$')
-        plt.ylabel(r'Luminosity $log_{10}(L/L_{\odot})$')
-        plt.show()
+    def HRD(self, cut_PMS=True):
+        if cut_PMS:
+            plt.plot(self.log_teff[np.where(self.He_core_mass > 1e-5 * self.mass[0])], self.log_lum[np.where(self.He_core_mass > 1e-5 * self.mass[0])])
+            plt.xlim(max(self.log_teff) ,min(self.log_teff))
+            plt.title(r'HRD')
+            plt.xlabel(r'Effective Temperature $log_{10}(K)$')
+            plt.ylabel(r'Luminosity $log_{10}(L/L_{\odot})$')
+            plt.show()
+        else:
+            plt.plot(self.log_teff, self.log_lum)
+            plt.xlim(max(self.log_teff) ,min(self.log_teff))
+            plt.title(r'HRD')
+            plt.xlabel(r'Effective Temperature $log_{10}(K)$')
+            plt.ylabel(r'Luminosity $log_{10}(L/L_{\odot})$')
+            plt.show()
         
     def rhoCTC(self):
         plt.plot(self.log_rho_c, self.log_T_c)
@@ -165,19 +174,17 @@ class runUtils:
         
 
         
-    def copyInputs(self, first=False):
-        if not first:
-            #workdir_str = str(self.workdir)
-            #os.chdir(workdir_str)
-            os.system('rm modin')
-            os.system('tail -399 modout > modin')
+    def copyInputs(self):
+
+        os.system('rm modin')
+        os.system('tail -399 modout > modin')
+        
+        os.system('rm nucmodin')
+        os.system('mv nucmodout nucmodin')
             
-            os.system('rm nucmodin')
-            os.system('mv nucmodout nucmodin')
-            
-    def updatePlot(self, first=False):
+    def updatePlot(self):
         plotorg = open('plot', 'r')
-        if first:
+        if not os.path.isfile('fullPlot'):
             fullPlot = open('fullPlot', 'w+')
             fullPlot.close()
         
@@ -232,7 +239,7 @@ class inputManipulation:
             self.modin_He_shell_pressure = ''
             
     def modinReWrite(self):
-        new_line_stream = '   '+self.modin_mass+ '  ' +self.modin_timestep_size+ '  ' +self.modin_age+ '  ' +self.modin_bin_period+ '  ' +self.modin_total_bin_mass+ '  ' +self.modin_art_eng_gen+ '  ' +self.modin_mesh_point_num+ ' '+self.modin_desired_num_models+ '  ' +self.modin_star_model_num+ '    ' +self.modin_which_star+ ' '+self.modin_H_shell_pressure+ ' '+ self.modin_He_shell_pressure+'\n'
+        new_line_stream = '   '+self.modin_mass+ '  ' +self.modin_timestep_size+ '  ' +self.modin_age+ '  ' +self.modin_bin_period+ '  ' +self.modin_total_bin_mass+ '  ' +self.modin_art_eng_gen+ '  ' +self.modin_mesh_point_num+ ' '+self.modin_desired_num_models+ '  ' +self.modin_star_model_num+ '    ' +self.modin_which_star+'\n'#+ ' '+self.modin_H_shell_pressure+ ' '+ self.modin_He_shell_pressure+'\n'
 
         with open("modin") as f:
             lines = f.readlines()
@@ -264,7 +271,7 @@ class inputManipulation:
         self.data_binary_mode = line_stream[11]
         
     def dataReWrite(self):
-        new_line_stream = ' '+self.data_mesh_points+'  '+self.data_first_timestep_max_iter+'  '+self.data_later_timestep_max_iter+'  '+self.data_jin+'  '+self.data_jout+'   '+self.data_how_remesh+'   '+self.data_last_corrections+'   '+self.data_thermal_gen_rate+'   '+self.data_H_burn+'   '+self.data_He_burn+'   '+self.data_C_burn+'   '+self.data_binary_mode
+        new_line_stream = ' '+self.data_mesh_points+'  '+self.data_first_timestep_max_iter+'  '+self.data_later_timestep_max_iter+'  '+self.data_jin+'  '+self.data_jout+'   '+self.data_how_remesh+'   '+self.data_last_corrections+'   '+self.data_thermal_gen_rate+'   '+self.data_H_burn+'   '+self.data_He_burn+'   '+self.data_C_burn+'   '+self.data_binary_mode+'\n'
         
         with open('data') as f:
             lines = f.readlines()
@@ -275,10 +282,67 @@ class inputManipulation:
                 f.write(item)
                 
                 
-        
-run = runUtils()
-inputs = inputManipulation()
-    
+#'''
+#Testing, to automatically contract a star of 1 solar mass to the ZAMS, then switch on nuke 
+#burning, and burn until the He Flash
+#God willing this actually works...
+#'''
+#if not os.path.isfile('modin'):
+#    os.system('tar -xvf bs2007.tar.gz')
+#
+##Set these classes up now
+#run = runUtils()
+#inputs = inputManipulation()
+#
+##Compile the code
+#run.compiler()
+#
+##Alter the mass of the star to 1 solar mass
+#inputs.modin_mass = '1.000000E+00'
+##Run for 2000 timesteps to ensure we reach the ZAMS
+#inputs.modin_desired_num_models = '2000'
+##Shut off the hydrogen, helium and carbon burning
+#inputs.data_H_burn = '0'
+#inputs.data_He_burn = '0'
+#inputs.data_C_burn = '0'
+##Write to data and modin
+#inputs.modinReWrite()
+#inputs.dataReWrite()
+#
+##Run the model
+#run.runSim()
+#
+##Update the plots
+#run.updatePlot()
+#
+##Update the modin files 
+#run.copyInputs()
+#
+##Read in the new modin and data files
+#inputs.modinRead()
+#inputs.dataRead()
+#
+##Run 9999 timessteps now, to reach He Flash
+#inputs.modin_desired_num_models = '9999'
+##Turn on Hydrogen, Helium and Carbon burning
+#inputs.data_H_burn = '1'
+#inputs.data_He_burn = '1'
+#inputs.data_C_burn = '1'
+#
+##Write data and modin
+#inputs.modinReWrite()
+#inputs.dataReWrite()
+#
+##Run the model again
+#run.runSim()
+#
+##Update the plotfile
+#run.updatePlot()
+#
+##Generate the plotting object
+#plot = dataStore()
+##Plot an HRD
+#plot.HRD(cut_PMS=False)
         
     
         
